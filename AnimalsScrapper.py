@@ -2,10 +2,14 @@ import requests
 import shutil
 import logging
 import re
+import concurrent.futures
 from bs4 import BeautifulSoup
 import os.path
+
 REQUEST_RETRIES_NUM = 10
 REQUEST_RETRY_WAIT_TIME = 2
+NUM_OF_IMAGE_DOWNLOAD_THREADS = 12
+
 LOGGER_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 class AnimalsScrapper:
@@ -20,7 +24,6 @@ class AnimalsScrapper:
         self._animals_synonyms = {}
         self._download_pics = download_pics
         self._download_path = download_path
-        self._img_download_links = {}
         self._logger = logging.getLogger('scrapper')
         self._logger.setLevel(logging.DEBUG)
         # create console handler with a higher log level
@@ -42,7 +45,8 @@ class AnimalsScrapper:
         self._logger.info("Remote data retrieved from URL successfully")
         animals_gen = self._generate_animals(raw_content)
         self._logger.info("Generating animals")
-        for name, collateral_adjectives, synonym, img_download_link in animals_gen:
+        animal_name_objs_dict = {}
+        for name, collateral_adjectives, synonym, animal_name_obj in animals_gen:
             if synonym:
                 # Add the name to the synonyms list
                 self._animals_synonyms[name] = synonym
@@ -52,8 +56,10 @@ class AnimalsScrapper:
                 else:
                     self._animals_dict[collateral_adjective] = [name]
             if self._download_pics:
-                self._img_download_links[name] = img_download_link
+                # Save the name_obj
+                animal_name_objs_dict [name] = animal_name_obj
                 for collateral_adjective in collateral_adjectives:
+                    # Save the local links to the images to be downloaded
                     lcl_image_path = os.path.join(self._download_path, f'{name}.png')
                     tagged_image = f'<img src="{lcl_image_path}" alt="{name}">'
                     self._animals_dict[collateral_adjective].append(tagged_image)
@@ -61,25 +67,67 @@ class AnimalsScrapper:
         self._logger.info("Animals generated successfully")
         if self._download_pics:
             self._logger.info("Downloading animal pics")
-            self._download_images()
+            self._download_images(animal_name_objs_dict)
 
-    def _download_images(self):
+    def _download_images(self, animal_names_obj_dict, threads_num = NUM_OF_IMAGE_DOWNLOAD_THREADS):
         """
-        Downloads all the images in self._img_download_links to self._download_path
+        Downloads the images for the animals names concurrently
+        :param animal_names_obj_dict: a dict in the format: {name:name_obj}, (name_obj is beautiful_soup obj)
+        :param threads_num: num of threads to run
         :return:
         """
-        for name, link in self._img_download_links.items():
-            if link == '':
-                continue
-            try:
-                response = requests.get(link, stream=True)
-                self._logger.debug(f"Downloading image for {name}")
-            except requests.exceptions.RequestException:
-                self._logger.error(f"Error donloading image for {name}")
-                continue
-            with open(os.path.join(self._download_path, f'{name}.png'), 'wb') as out_file:
-                shutil.copyfileobj(response.raw, out_file)
-            del response
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads_num) as executor:
+            futures = []
+            for name, name_obj in animal_names_obj_dict.items():
+                futures.append((executor.submit(self._download_image, name, name_obj)))
+
+    def _download_image(self, name, name_obj):
+        """
+        Downloads an image of the animal by following its link from the name_obj
+        :param name: The animal name
+        :param name_obj: The beautiful_soup object of the animal name
+        :return:
+        """
+        # Go to the animal page and find its picture from the info box
+        link = self._get_animal_pic_download_link(name_obj)
+        # link is empty if no picture could be found in this method
+        if link == '':
+            return
+        try:
+            response = requests.get(link, stream=True)
+            self._logger.debug(f"Downloading image for {name}")
+        except requests.exceptions.RequestException:
+            self._logger.error(f"Error downloading image for {name}")
+            return
+        with open(os.path.join(self._download_path, f'{name}.png'), 'wb') as out_file:
+            shutil.copyfileobj(response.raw, out_file)
+        del response
+
+    def _get_animal_pic_download_link(self, animal_name):
+        """
+        Returns the image download link for a animal soup element from the table
+        Goes to the animal page and find its picture from the info box
+        :param animal_name: Animal to retrieve the pic for
+        :return:
+        """
+        # Get the link to the animal's page
+        self._logger.debug(f"Getting image download link for {animal_name}")
+        link = animal_name.find_all('a', href=True)[0]['href']
+        animal_page_link = f'https://en.wikipedia.org{link}'
+        # Go to the animal page
+        content = self._get_raw_html_content(animal_page_link)
+        soup = BeautifulSoup(content, 'html.parser')
+        # go to the infobox
+        infobox = soup.find_all('table', {'class':['infobox biota', 'infobox biota biota-infobox']})
+        if not infobox:
+            self._logger.warning(f"Couldn't find info box for {animal_name}")
+            return ""
+        # Go for the image in the infobox
+        image = infobox[0].find_all('img', src=True)
+        if not image:
+            self._logger.warning(f"Couldn't find info box image for {animal_name}")
+            return ""
+        return f'http:{image[0]["src"]}'
 
     def get_animals(self):
         """
@@ -96,8 +144,7 @@ class AnimalsScrapper:
         "https://en.wikipedia.org/wiki/List_of_animal_names"
         sensitive to its format.
         :param raw_content: content as retrieved from requests
-        :return: A generator that yields a tuple: (name, collateral_adjectives_list, animal_synonym, image_download_link)
-        image_download_link != "" <=> self._download_pics == True
+        :return: A generator that yields a tuple: (name, collateral_adjectives_list, animal_synonym, animal_name_obj)
         """
         image_download_link = ""
         soup = BeautifulSoup(raw_content, 'html.parser')
@@ -108,18 +155,15 @@ class AnimalsScrapper:
         for row in rows:
             cols = row.find_all('td')
             if len(cols) != 0:
-                name = cols[0].get_text()
+                animal_name_obj = cols[0]
+                animal_adj_obj = cols[5]
+                name = animal_name_obj.get_text()
                 name, synonym = self._parse_animal_name(name)
                 # Read all adjective line by line
-                collateral_adjectives = cols[5].get_text(strip=True, separator="\n").split("\n")
+                collateral_adjectives = animal_adj_obj.get_text(strip=True, separator="\n").split("\n")
                 # Clean and remove unneeded chars
-                collateral_adjectives = [adj for adj in collateral_adjectives if re.match('^[A-Za-z]+$', adj)]
-
-                if self._download_pics:
-                    self._logger.debug(f"Getting image download link for {name}")
-                    image_download_link = self._get_animal_pic_download_link(cols[0])
-
-                yield name, collateral_adjectives, synonym, image_download_link
+                collateral_adjectives = [adj for adj in collateral_adjectives if re.match('^[A-Za-z?]+$', adj)]
+                yield name, collateral_adjectives, synonym, animal_name_obj
 
     def _parse_animal_name(self, name):
         """
@@ -131,7 +175,9 @@ class AnimalsScrapper:
         """
         synonym = ""
         # Perform checks for the case of a reference to another Animal
+        # For case 1
         other_animal_ref_str_index = name.find("Also see")
+        # For case 2
         synonym_match_lst = re.match("([A-Za-z ]+)([(A-Za-z)]*)-* See ([A-Za-z ]+)", name)
         if other_animal_ref_str_index != -1:
             # Case 1: "Also See" - the animal is appended by "Also See" without whitespace, remove it
@@ -144,26 +190,6 @@ class AnimalsScrapper:
             names_list = re.findall("^[A-Za-z ]+", name)
             name = names_list[0].rstrip()
         return name, synonym
-
-    def _get_animal_pic_download_link(self, animal_name):
-        """
-        Returns the download link for the given animal soup element from the table
-        :param animal_name: Animal to retrieve the pic for
-        :return:
-        """
-        link = animal_name.find_all('a', href=True)[0]['href']
-        animal_page_link = f'https://en.wikipedia.org{link}'
-        content = self._get_raw_html_content(animal_page_link)
-        soup = BeautifulSoup(content, 'html.parser')
-        infobox = soup.find_all('table', {'class':['infobox biota', 'infobox biota biota-infobox']})
-        if not infobox:
-            self._logger.warning(f"Couldn't find info box for {animal_name}")
-            return ""
-        image = infobox[0].find_all('img', src=True)
-        if not image:
-            self._logger.warning(f"Couldn't find info box image for {animal_name}")
-            return ""
-        return f'http:{image[0]["src"]}'
 
     def _get_raw_html_content(self, target_url):
         """

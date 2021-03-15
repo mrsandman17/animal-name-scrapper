@@ -7,10 +7,14 @@ BAD_URL_HTTP_ERROR_404 = 'http://www.google.com/notthere'
 BAD_URL_TIMEOUT = 'http://www.google.com:81'
 GOOD_URL = 'https://en.wikipedia.org/wiki/List_of_animal_names'
 
-EXPECTED_RESULT_TEST_FILE = "expected_result_test_file.html"
+EXPECTED_RESULT_TEST_FILE = "expected_result_test_file_no_images.html"
 
 
 class TestAnimalsScrapper(unittest.TestCase):
+    """
+    A very basic test class,  Has 2 tests for the network errors going through  the AnimalsScrapper
+    And an end to end test of the basic task.
+    """
 
     def test_http_error(self):
         scrapper = AnimalsScrapper(BAD_URL_HTTP_ERROR_404)
@@ -22,7 +26,8 @@ class TestAnimalsScrapper(unittest.TestCase):
 
     def test_end_to_end(self):
         """
-        Verifies that the parsed result is as expected
+        Verifies that the parsed result is as expected, compares it to pre-prepared data
+        that is assumed to be the Truth
         tests the whole pipeline (incl. the requests)
         """
         with open(EXPECTED_RESULT_TEST_FILE, "r") as f:

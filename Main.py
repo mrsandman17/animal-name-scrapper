@@ -10,10 +10,16 @@ DEFAULT_DOWNLOAD_PATH = r'/tmp'
 DEBUG = True
 
 def main():
+    """
+
+    :return:
+    """
+    # Set up a parser with 2 optional arguments
     parser = argparse.ArgumentParser(description='Scrapping Animal names from wikipedia')
     parser.add_argument('--d', default=False, action='store_true', help='Download animals images')
     parser.add_argument('--path', default=DEFAULT_DOWNLOAD_PATH, type=str, help='Images download path')
     args = parser.parse_args()
+    # init the scrapper
     scrapper = AnimalsScrapper(TARGET_URL, download_pics=args.d, download_path=args.path)
     try:
         scrapper.run()
@@ -21,6 +27,7 @@ def main():
         if DEBUG:
             traceback.print_exc()
         raise SystemExit(e)
+    # Print the data as json (more pretty)
     print (json.dumps(scrapper.get_animals(), indent=2, default=str))
     print(json.dumps(scrapper.get_synonyms(), indent=2, default=str))
     write_to_html(scrapper.get_animals())
