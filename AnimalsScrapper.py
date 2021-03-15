@@ -91,7 +91,6 @@ class AnimalsScrapper:
                     names_list = re.findall("^[A-Za-z ]+", name)
                     name = names_list[0].rstrip()
                 # The adjectives are all which are strings in the column
-                # collateral_adjectives = [content for content in cols[5].contents if isinstance(content, str)]
                 collateral_adjectives = cols[5].get_text(strip=True, separator="\n").split("\n")
                 yield name, collateral_adjectives, synonym
 
