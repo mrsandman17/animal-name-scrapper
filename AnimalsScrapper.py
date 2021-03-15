@@ -17,6 +17,7 @@ class AnimalsScrapper:
         """
         self._target_url = target_url
         self._animals_dict = {}
+        self._animals_synonyms = []
         self._logger = logging.getLogger('scrapper')
         self._logger.setLevel(logging.DEBUG)
         # create console handler with a higher log level
@@ -37,7 +38,10 @@ class AnimalsScrapper:
         self._logger.info("Remote data retrieved from URL successfully")
         animals_gen = self._generate_animals(raw_content)
         self._logger.info("Generating animals")
-        for name, collateral_adjectives in animals_gen:
+        for name, collateral_adjectives, synonym in animals_gen:
+            if synonym:
+                # Add the name to the synonyms list
+                self._animals_synonyms.append((name, synonym))
             for collateral_adjective in collateral_adjectives:
                 if collateral_adjective in self._animals_dict:
                     self._animals_dict[collateral_adjective].append(name)
@@ -51,14 +55,18 @@ class AnimalsScrapper:
         """
         return self._animals_dict
 
+    def get_synonyms(self):
+        return self._animals_synonyms
+
     def _generate_animals(self, raw_content):
         """
         Parses the animals list in the page:
         "https://en.wikipedia.org/wiki/List_of_animal_names"
         sensitive to its format.
         :param raw_content: content as retrieved from requests
-        :return: A generator that yields a tuple: (name, collateral_adjectives_list)
+        :return: A generator that yields a tuple: (name, collateral_adjectives_list, name_ref)
         """
+
         soup = BeautifulSoup(raw_content, 'html.parser')
         # Look at the third table in the page
         table = soup.findAll('table')[2]
@@ -67,11 +75,25 @@ class AnimalsScrapper:
         for row in rows:
             cols = row.find_all('td')
             if len(cols) != 0:
-                name = re.findall("^[A-Za-z ]+", cols[0].text)[0].rstrip()
-                if name.find("Also see") != -1:
-                    name = name[:name.find("Also see")]
-                collateral_adjectives = re.findall("([A-Za-z]+)", cols[5].text)
-                yield name, collateral_adjectives
+                synonym = ""
+                name = cols[0].get_text()
+                # Perform checks for the case of a reference to another Animal
+                other_animal_ref_str_index = name.find("Also see")
+                synonym_match_lst = re.match("([A-Za-z ]+)([(A-Za-z)]*)-* See ([A-Za-z ]+)", name)
+                if other_animal_ref_str_index != -1:
+                    # Case 1: "Also See" - the animal is appended by "Also See" without whitespace, remove it
+                    name = name[:other_animal_ref_str_index]
+                if synonym_match_lst:
+                    # Case 2: "See" - Add a synonym for this animal
+                    name = synonym_match_lst.group(1)
+                    synonym = synonym_match_lst.group(3)
+                else:
+                    names_list = re.findall("^[A-Za-z ]+", name)
+                    name = names_list[0].rstrip()
+                # The adjectives are all which are strings in the column
+                # collateral_adjectives = [content for content in cols[5].contents if isinstance(content, str)]
+                collateral_adjectives = cols[5].get_text(strip=True, separator="\n").split("\n")
+                yield name, collateral_adjectives, synonym
 
     def _get_raw_html_content(self):
         """
