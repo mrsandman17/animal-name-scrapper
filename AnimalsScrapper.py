@@ -43,6 +43,7 @@ class AnimalsScrapper:
                     self._animals_dict[collateral_adjective].append(name)
                 else:
                     self._animals_dict[collateral_adjective] = [name]
+        self._logger.info("Animals generated successfully")
 
     def get_animals(self):
         """
@@ -66,9 +67,9 @@ class AnimalsScrapper:
         for row in rows:
             cols = row.find_all('td')
             if len(cols) != 0:
-                name = re.match("^[A-Za-z ]+", cols[0].text)
-                if name is not None:
-                    name = name.group().rstrip()
+                name = re.findall("^[A-Za-z ]+", cols[0].text)[0].rstrip()
+                if name.find("Also see") != -1:
+                    name = name[:name.find("Also see")]
                 collateral_adjectives = re.findall("([A-Za-z]+)", cols[5].text)
                 yield name, collateral_adjectives
 
