@@ -64,6 +64,10 @@ class AnimalsScrapper:
             self._download_images()
 
     def _download_images(self):
+        """
+        Downloads all the images in self._img_download_links to self._download_path
+        :return:
+        """
         for name, link in self._img_download_links.items():
             if link == '':
                 continue
@@ -104,7 +108,6 @@ class AnimalsScrapper:
         for row in rows:
             cols = row.find_all('td')
             if len(cols) != 0:
-
                 name = cols[0].get_text()
                 name, synonym = self._parse_animal_name(name)
                 # Read all adjective line by line
