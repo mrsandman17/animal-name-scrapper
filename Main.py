@@ -24,7 +24,15 @@ def main():
 def write_to_html(animals_dict):
     html_data = json2html.convert(animals_dict)
     with open(OUTPUT_HTML_FILE_NAME, "w") as f:
-        f.write(html_data)
+        f.write(unescape(html_data))
+
+def unescape(s):
+    s = s.replace("&lt;", "<")
+    s = s.replace("&gt;", ">")
+    s = s.replace("&quot;", '"')
+    # this has to be last:
+    s.replace("&amp;", "&")
+    return s
 
 if __name__ == '__main__':
     main()

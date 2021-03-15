@@ -55,7 +55,7 @@ class AnimalsScrapper:
                 self._img_download_links[name] = img_download_link
                 for collateral_adjective in collateral_adjectives:
                     lcl_image_path = os.path.join(self._download_path, f'{name}.png')
-                    tagged_image = f'<img src="{lcl_image_path}" alt="{name}"'
+                    tagged_image = f'<img src="{lcl_image_path}" alt="{name}">'
                     self._animals_dict[collateral_adjective].append(tagged_image)
 
         self._logger.info("Animals generated successfully")
@@ -65,8 +65,14 @@ class AnimalsScrapper:
 
     def _download_images(self):
         for name, link in self._img_download_links.items():
-            response = requests.get(link, stream=True)
-            self._logger.debug(f"Downloading image for {name}")
+            if link == '':
+                continue
+            try:
+                response = requests.get(link, stream=True)
+                self._logger.debug(f"Downloading image for {name}")
+            except requests.exceptions.RequestException:
+                self._logger.error(f"Error donloading image for {name}")
+                continue
             with open(os.path.join(self._download_path, f'{name}.png'), 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
             del response
@@ -146,8 +152,15 @@ class AnimalsScrapper:
         animal_page_link = f'https://en.wikipedia.org{link}'
         content = self._get_raw_html_content(animal_page_link)
         soup = BeautifulSoup(content, 'html.parser')
-        image_link = soup.findAll('img', src=True)[0]
-        return f'http:{image_link["src"]}'
+        infobox = soup.find_all('table', {'class':['infobox biota', 'infobox biota biota-infobox']})
+        if not infobox:
+            self._logger.warning(f"Couldn't find info box for {animal_name}")
+            return ""
+        image = infobox[0].find_all('img', src=True)
+        if not image:
+            self._logger.warning(f"Couldn't find info box image for {animal_name}")
+            return ""
+        return f'http:{image[0]["src"]}'
 
     def _get_raw_html_content(self, target_url):
         """
