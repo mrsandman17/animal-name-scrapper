@@ -1,6 +1,9 @@
 # animal-name-scrapper
 Getting Started:
-Run "Main.py"
+Run:
+```
+Main.py
+```
 If you wish to also download the images you can add
 ```
 Main.py --d
@@ -13,7 +16,7 @@ Main.py --d --path "YOURPATH"
 
 **Time it took to write the code:**
 
-Approx an hour for a basic working version, Approx. 2-2.5 more hours for handling the edge cases 
+Approx. an hour for a basic working version, Approx. 2-2.5 more hours for handling the edge cases 
 (especially with the data edge cases and the synonyms dict).
 Another hour for writing the unit tests and parsing it into an html file.
 A few hours for the image download mechanism, some code refactoring and documentation.
