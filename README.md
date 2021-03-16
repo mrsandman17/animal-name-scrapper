@@ -16,12 +16,12 @@ Main.py --d --path "YOURPATH"
 Approx an hour for a basic working version, Approx. 2-2.5 more hours for handling the edge cases 
 (especially with the data edge cases and the synonyms dict)
 Another hour for writing the unit tests and parsing it into an html file.
-A few hours for the image download mechanism. some code refactoring and documentation.
+A few hours for the image download mechanism, some code refactoring and documentation.
 Adding thread support for downloading images was simpler then expected.
 
 **Time Complexity approximation:**
 
-O(n) where n is the number of animals in the table
+O(n) where n is the number of animals in the table.
 For each animal there are a few collateral_adjectives, but this num < C, for some constant C (We can assume C<=5)
 Searching for values in the dict(hashtable) is done in O(1), as is adding values to the table.
 
