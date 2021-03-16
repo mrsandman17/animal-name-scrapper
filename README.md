@@ -14,7 +14,7 @@ Main.py --d --path "YOURPATH"
 **Time it took to write the code:**
 
 Approx an hour for a basic working version, Approx. 2-2.5 more hours for handling the edge cases 
-(especially with the data edge cases and the synonyms dict)
+(especially with the data edge cases and the synonyms dict).
 Another hour for writing the unit tests and parsing it into an html file.
 A few hours for the image download mechanism, some code refactoring and documentation.
 Adding thread support for downloading images was simpler then expected.
@@ -22,7 +22,7 @@ Adding thread support for downloading images was simpler then expected.
 **Time Complexity approximation:**
 
 O(n) where n is the number of animals in the table.
-For each animal there are a few collateral_adjectives, but this num < C, for some constant C (We can assume C<=5)
+For each animal there are a few collateral_adjectives, but this num < C, for some constant C (We can assume C<=5).
 Searching for values in the dict(hashtable) is done in O(1), as is adding values to the table.
 
 Main bottleneck of the application is the images, It has 2 parts: getting the image url and downloading the image. 
@@ -45,6 +45,7 @@ As I have no guarantee the format won't change even slightly.
 
 4. I am aware that the method of retrieving the images can miss some images, 
 but I think the method I chose to take the image from the infobox has a pretty high chance overall of being correct.
-A better solution might be to address another site where the pictures are tagged and present for all animals.
+A better solution might be to access some tag attributes that can verify the animal in the image,
+Or accessing another site where the pictures are tagged and present for all animals.
 I thought it was the case for wikipedia, but apparently it isn't.
 
